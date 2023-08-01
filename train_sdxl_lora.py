@@ -1,6 +1,8 @@
 import os
 import sys
 import subprocess
+import time
+import shutil
 
 # 训练模式(Lora、db、Sdxl_lora、Sdxl_db、controlnet(未完成))
 train_mode = "sdxl_lora"
@@ -518,20 +520,34 @@ def gen_activate_pyenv(env_name: str = "venv"):
     return command
 
 
+def backup_file(fn):
+    if os.path.exists(fn):
+        bak_file = fn + "_" + time.strftime("%Y%m%d%H%M%S") + ".bak"
+        shutil.copy(fn, bak_file)
+        return True
+    return False
+
+
 def gen_train_shell():
     activate_command = gen_activate_pyenv()
     output_command = ""
     if output_config:
+        backup_file(config_file)
         output_command = gen_command(ext_args + ["--output_config", "--config_file={}".format(config_file)])
+
+        output_dir = os.path.dirname(config_file)
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
 
     train_command = gen_command(ext_args)
     command = f"### activate \n {activate_command} \n\n# config toml \n {output_command} \n\n# train\n {train_command}"
     print(command)
-
     if sys.platform == "win32":
         ext = ".ps1"
     else:
         ext = ".sh"
+    shell_fn = f"train_{output_name}{ext}"
+    backup_file(shell_fn)
     with open(f"train_{output_name}{ext}", "w") as f:
         f.write(command)
 
