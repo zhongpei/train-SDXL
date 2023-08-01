@@ -510,7 +510,7 @@ def gen_command(extargs: list[str]):
 
 
 def gen_activate_pyenv(env_name: str = "venv"):
-    if sys.platform == "windows":
+    if sys.platform == "win32":
         command = os.path.join(os.getcwd(), env_name, "Scripts", "activate")
     else:
         path = os.path.join(os.getcwd(), env_name, "bin", "activate")
@@ -527,7 +527,8 @@ def gen_train_shell():
     train_command = gen_command(ext_args)
     command = f"### activate \n {activate_command} \n\n# config toml \n {output_command} \n\n# train\n {train_command}"
     print(command)
-    if sys.platform == "windows":
+
+    if sys.platform == "win32":
         ext = ".ps1"
     else:
         ext = ".sh"
