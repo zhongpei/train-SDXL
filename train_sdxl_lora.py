@@ -8,7 +8,7 @@ import shutil
 train_mode = "sdxl_lora"
 
 # Train data path | 设置训练用模型、图片
-pretrained_model = "E:\\sdwebui\\stable-diffusion-webui\\models\\Stable-diffusion\\XL\\sdXL_v10.safetensors"  # base model path | 底模路径
+pretrained_model = "E:\\sdwebui\\stable-diffusion-webui\\models\\Stable-diffusion\\XL\\sdXL_v10_fix_vae.safetensors"  # base model path | 底模路径
 vae = ""
 is_v2_model = 0  # SD2.0 model | SD2.0模型 2.0模型下 clip_skip 默认无效
 v_parameterization = 0  # parameterization | 参数化 v2 非512基础分辨率版本必须使用。
@@ -24,15 +24,15 @@ base_weights_multiplier = "1.0"  # 指定合并模型的权重，多个用空格
 
 # Train related params | 训练相关参数
 resolution = "1024,1024"  # image resolution w,h. 图片分辨率，宽,高。支持非正方形，但必须是 64 倍数。
-batch_size = 2  # batch size 一次性训练图片批处理数量，根据显卡质量对应调高。
+batch_size = 8  # batch size 一次性训练图片批处理数量，根据显卡质量对应调高。
 max_train_epoches = 20  # max train epoches | 最大训练 epoch
 save_every_n_epochs = 2  # save every n epochs | 每 N 个 epoch 保存一次
 
 gradient_checkpointing = 1  # 梯度检查，开启后可节约显存，但是速度变慢
 gradient_accumulation_steps = 0  # 梯度累加数量，变相放大batchsize的倍数
 
-network_dim = 32  # network dim | 常用 4~128，不是越大越好
-network_alpha = 16  # network alpha | 常用与 network_dim 相同的值或者采用较小的值，如 network_dim的一半 防止下溢。默认值为 1，使用较小的 alpha 需要提升学习率。
+network_dim = 64  # network dim | 常用 4~128，不是越大越好
+network_alpha = 32  # network alpha | 常用与 network_dim 相同的值或者采用较小的值，如 network_dim的一半 防止下溢。默认值为 1，使用较小的 alpha 需要提升学习率。
 
 # dropout | 抛出(目前和lycoris不兼容，请使用lycoris自带dropout)
 network_dropout = 0  # dropout 是机器学习中防止神经网络过拟合的技术，建议0.1~0.3
@@ -144,7 +144,7 @@ min_timestep = 0  # 最小时序，默认值0
 max_timestep = 1000  # 最大时序，默认值1000
 cache_text_encoder_outputs = 1  # 开启缓存文本编码器，开启后减少显存使用。但是无法和shuffle共用
 cache_text_encoder_outputs_to_disk = 1  # 开启缓存文本编码器，开启后减少显存使用。但是无法和shuffle共用
-no_half_vae = 1  # 禁止半精度，防止黑图。无法和mixed_precision混合精度共用。
+no_half_vae = 0  # 禁止半精度，防止黑图。无法和mixed_precision混合精度共用。
 bucket_reso_steps = 32  # SDXL分桶可以选择32或者64。32更精细分桶。默认为64
 
 # db checkpoint train
@@ -520,10 +520,12 @@ def gen_activate_pyenv(env_name: str = "venv"):
     return command
 
 
-def backup_file(fn):
+def backup_file(fn,remove=False):
     if os.path.exists(fn):
         bak_file = fn + "_" + time.strftime("%Y%m%d%H%M%S") + ".bak"
         shutil.copy(fn, bak_file)
+        if remove:
+            os.remove(fn)
         return True
     return False
 
@@ -532,7 +534,7 @@ def gen_train_shell():
     activate_command = gen_activate_pyenv()
     output_command = ""
     if output_config:
-        backup_file(config_file)
+        backup_file(config_file,remove=True)
         output_command = gen_command(ext_args + ["--output_config", "--config_file={}".format(config_file)])
 
         output_dir = os.path.dirname(config_file)
