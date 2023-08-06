@@ -12,10 +12,10 @@ pretrained_model = "E:\\sdwebui\\stable-diffusion-webui\\models\\Stable-diffusio
 vae = ""
 is_v2_model = 0  # SD2.0 model | SD2.0模型 2.0模型下 clip_skip 默认无效
 v_parameterization = 0  # parameterization | 参数化 v2 非512基础分辨率版本必须使用。
-train_data_dir = "E:\\train_XL\\yok\\train_girl"  # train dataset path | 训练数据集路径
+train_data_dir = "E:\\train_XL\\xiaoren\\images"  # train dataset path | 训练数据集路径
 reg_data_dir = ""  # reg dataset path | 正则数据集化路径
 network_weights = ""  # pretrained weights for LoRA network | 若需要从已有的 LoRA 模型上继续训练，请填写 LoRA 模型路径。
-training_comment = "kano yura"  # training_comment | 训练介绍，可以写作者名或者使用触发关键词
+training_comment = "xiaorenshu by fofo"  # training_comment | 训练介绍，可以写作者名或者使用触发关键词
 dataset_class = ""
 
 # 差异炼丹法
@@ -70,6 +70,7 @@ lr_scheduler = "constant_with_warmup"  # "linear", "cosine", "cosine_with_restar
 # constant，常量不变, constant_with_warmup 线性增加后保持常量不变, linear 线性增加线性减少, polynomial 线性增加后平滑衰减, cosine 余弦波曲线, cosine_with_restarts 余弦波硬重启，瞬间最大值。
 # 推荐默认cosine_with_restarts或者polynomial，配合输出多个epoch结果更玄学
 lr_warmup_steps = 100  # warmup steps | 学习率预热步数，lr_scheduler 为 constant 或 adafactor 时该值需要设为0。仅在 lr_scheduler 为 constant_with_warmup 时需要填写这个值
+lr_warmup_steps_p = 0.05  # warmup steps per | 学习率预热步百分率和lr_warmup_steps取最大值，lr_scheduler 为 constant 或 adafactor 时该值需要设为0。仅在 lr_scheduler 为 constant_with_warmup 时需要填写这个值
 lr_scheduler_num_cycles = 1  # restarts nums | 余弦退火重启次数，仅在 lr_scheduler 为 cosine_with_restarts 时需要填写这个值
 
 # 优化器
@@ -103,7 +104,7 @@ conv_block_dims = "32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,32,3
 conv_block_alphas = "1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1"  # convalpha分层，25层
 
 # Output settings | 输出设置
-output_name = "kano_yura"  # output model name | 模型保存名称
+output_name = "xiaoren"  # output model name | 模型保存名称
 save_model_as = "safetensors"  # model save ext | 模型保存格式 ckpt, pt, safetensors
 mixed_precision = "fp16"  # 开启后更节约显存，bf16效果更好，默认:fp16 开启no_half_vae后失效
 save_precision = "fp16"  # bf16效果更好，默认:fp16
@@ -119,9 +120,9 @@ output_config = 1  # 开启后直接输出一个toml配置文件，但是无法�
 config_file = os.path.join(os.path.dirname(__file__), "toml", output_name + ".toml")  # 输出文件保存目录和文件名称，默认用模型保存同名。
 
 # 输出采样图片
-enable_sample = 1  # 1开启出图，0禁用
+enable_sample = 0  # 1开启出图，0禁用
 sample_every_n_epochs = 1  # 每n个epoch出一次图
-sample_prompts = "./toml/1girl.txt"  # prompt文件路径
+sample_prompts = "./toml/1girl_1024.txt"  # prompt文件路径
 sample_sampler = "ddim"  # 采样器 'ddim', 'pndm', 'heun', 'dpmsolver', 'dpmsolver++', 'dpmsingle', 'k_lms', 'k_euler', 'k_euler_a', 'k_dpm_2', 'k_dpm_2_a'
 
 # wandb 日志同步
@@ -476,9 +477,35 @@ if network_module:
 if gradient_accumulation_steps:
     ext_args.append(f"--gradient_accumulation_steps={gradient_accumulation_steps}")
 
+
+def get_total_step(train_data_dir: str, batch_size: int, max_train_epoches: int):
+    train_data_dir = os.path.abspath(train_data_dir)
+    total_step = 0
+    for dir in os.listdir(train_data_dir):
+        step = 0
+
+        loop = dir.split("_")[0]
+        loop = int(loop)
+        for file in os.listdir(os.path.join(train_data_dir, dir)):
+            if file.endswith(".txt"):
+                step += 1
+        print(f"dir {dir} has {step} steps * {loop} loops")
+        total_step += loop * step
+
+    total_step = total_step * max_train_epoches // batch_size
+    print(f"total step is {total_step}")
+    return total_step
+
+
 if lr_warmup_steps:
     if gradient_accumulation_steps:
         lr_warmup_steps = lr_warmup_steps * gradient_accumulation_steps
+    total_step = get_total_step(train_data_dir, batch_size, max_train_epoches)
+    if total_step < lr_warmup_steps:
+        lr_warmup_steps = total_step
+    if lr_warmup_steps_p:
+        lr_warmup_steps = max(int(total_step * lr_warmup_steps_p), lr_warmup_steps)
+    print(f"lr_warmup_steps is {lr_warmup_steps}")
     ext_args.append(f"--lr_warmup_steps={lr_warmup_steps}")
 
 
@@ -520,7 +547,7 @@ def gen_activate_pyenv(env_name: str = "venv"):
     return command
 
 
-def backup_file(fn,remove=False):
+def backup_file(fn, remove=False):
     if os.path.exists(fn):
         bak_file = fn + "_" + time.strftime("%Y%m%d%H%M%S") + ".bak"
         shutil.copy(fn, bak_file)
@@ -534,7 +561,7 @@ def gen_train_shell():
     activate_command = gen_activate_pyenv()
     output_command = ""
     if output_config:
-        backup_file(config_file,remove=True)
+        backup_file(config_file, remove=True)
         output_command = gen_command(ext_args + ["--output_config", "--config_file={}".format(config_file)])
 
         output_dir = os.path.dirname(config_file)
